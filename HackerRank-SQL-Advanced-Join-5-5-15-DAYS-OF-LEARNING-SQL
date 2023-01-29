@@ -1,0 +1,58 @@
+HackerRank: [SQL Advanced Join] (5/5) 15 DAYS OF LEARNING SQL Problem Statement: Julia conducted a days of learning SQL contest. The start date of the contest was March 01, 2016 and the end date was March 15, 2016. Write a query to print total number of unique hackers who made at least submission each day (starting on the first day of the contest), and find the hacker_id and name of the hacker who made maximum number of submissions each day. If more than one such hacker has a maximum number of submissions, print the lowest hacker_id. The query should print this information for each day of the contest, sorted by the date.
+
+Input Format: The following tables hold contest data:
+
+Hackers: The hacker_id is the id of the hacker, and name is the name of the hacker.
+
+Submissions: The submission_date is the date of the submission, submission_id is the id of the submission, hacker_id is the id of the hacker who made the submission, and score is the score of the submission.
+
+Here is the Link to the original HackerRank question: https://www.hackerrank.com/challenges/15-days-of-learning-sql/problem?isFullScreen=true
+
+--solved in oracle
+
+--The hacker_id who made more than one submission each day and taking the number of submissions per day as a refeance to compare it withe the hacker who made submission per each day of the whole period.
+WITH max_sub_per_day(submission_date,hacker_id,sub_per_day) AS(
+SELECT submission_date, min(hacker_id),sub_per_day
+FROM(
+    SELECT submission_date,
+    hacker_id,
+    RANK() OVER(partition by submission_date order by sub_per_day desc)                 rank,sub_per_day
+    FROM (
+        SELECT submission_date, hacker_id, count(submission_date) sub_per_day 
+        FROM submissions
+        GROUP BY submission_date, hacker_id))
+WHERE rank = 1
+GROUP BY submission_date,sub_per_day)
+,uni_hackers(unique_hackers,submission_date) AS (
+SELECT count(DISTINCT hacker_id) unique_hackers, submission_date 
+FROM (
+    --Creating Rank for date and submission of each hacker to know which hacker         submitted every day.
+    SELECT 
+    Dense_Rank() OVER ( ORDER BY submission_date) sub_day,
+    Dense_Rank() OVER (PARTITION BY hacker_id ORDER BY submission_date) hacker_sub     ,hacker_id,submission_date 
+    FROM submissions) temp
+WHERE sub_day = hacker_sub
+GROUP BY submission_date)
+,hacker_sub_per_day(hacker_id,submission_date) AS (
+SELECT distinct hacker_id, submission_date 
+FROM (
+    --Creating Rank for date and submission of each hacker to know which hacker         submitted every day.
+    SELECT 
+    Dense_Rank() OVER ( ORDER BY submission_date) sub_day,
+    Dense_Rank() OVER (PARTITION BY hacker_id ORDER BY submission_date) hacker_sub     ,hacker_id,submission_date 
+    FROM submissions) temp
+WHERE sub_day = hacker_sub
+order by submission_date,hacker_id)
+SELECT distinct hacker_sub_per_day.submission_date, uni_hackers.unique_hackers,
+CASE WHEN max_sub_per_day.sub_per_day > 1 THEN max_sub_per_day.hacker_id
+ELSE hacker_sub_per_day.hacker_id
+END
+, hackers.name
+FROM hacker_sub_per_day
+INNER JOIN max_sub_per_day 
+    ON max_sub_per_day.submission_date = hacker_sub_per_day.submission_date
+INNER JOIN hackers 
+    ON hackers.hacker_id = max_sub_per_day.hacker_id
+INNER JOIN uni_hackers 
+    ON uni_hackers.submission_date = hacker_sub_per_day.submission_date
+ORDER BY hacker_sub_per_day.submission_date;
